@@ -356,6 +356,7 @@ def download_control(_user_info):
                     return False
 
             csv_info[-5] = os.path.split(_file_name)[1]
+            csv_file.data_input(csv_info)
             if md_output: # 在下载完毕之前先输出到 Markdown，以尽可能保证高并发下载也能得到正确的推文顺序。
                 md_file.media_tweet_input(csv_info, prefix)
             count = 0
@@ -370,8 +371,6 @@ def download_control(_user_info):
                             down_count += 1
                     with open(_file_name,'wb') as f:
                         f.write(response.content)
-
-                    csv_file.data_input(csv_info)
 
                     if log_output:
                         print(f'{_file_name}=====>下载完成')
