@@ -20,7 +20,7 @@ class md_gen():
         self.file_count = 1 # 已输出的文件数量
 
     def md_close(self):
-        self.f.data_input('\n' + self.current_tweet_info[1] + '\n') # 输出最后一个推文的互动数据
+        self.f.write('\n' + self.current_tweet_info[1] + '\n') # 输出最后一个推文的互动数据
         self.f.close()
 
     def stamp2time(self, msecs_stamp:int) -> str:
