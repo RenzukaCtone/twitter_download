@@ -1,4 +1,5 @@
 import time
+import re
 from datetime import datetime
 
 class md_gen():

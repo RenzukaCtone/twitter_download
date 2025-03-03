@@ -14,8 +14,6 @@ from md_gen import md_gen
 from cache_gen import cache_gen
 from url_utils import quote_url
 
-max_concurrent_requests = 8     #最大并发数量，默认为8，对自己网络有自信的可以调高; 遇到多次下载失败时适当降低
-
 def del_special_char(string):
     string = re.sub(r'[^\u4e00-\u9fa5\u0030-\u0039\u0041-\u005a\u0061-\u007a\u3040-\u31FF\.]', '', string)
     return string
@@ -50,7 +48,6 @@ has_video = False
 csv_file = None
 cache_data = None
 down_log = False
-async_down = True
 autoSync = False
 
 md_file = None
@@ -91,8 +88,10 @@ with open('settings.json', 'r', encoding='utf8') as f:
         has_video = True
     if settings['log_output']:
         log_output = True
-    if not settings['async_down']:
-        async_down = False
+    if settings['max_concurrent_requests']:
+        max_concurrent_requests = settings['max_concurrent_requests']
+    else:
+        max_concurrent_requests = 8
 ###### proxy ######
     if settings['proxy']:
         proxies = settings['proxy']
@@ -109,9 +108,9 @@ with open('settings.json', 'r', encoding='utf8') as f:
 
     if not settings['md_output']:
         md_output = False
-        
-    if not settings['text_save']:
-        text_save = False
+
+    if settings['media_count_limit']:
+        media_count_limit = settings['media_count_limit']
 
     if settings['media_count_limit']:
         media_count_limit = settings['media_count_limit']
@@ -180,7 +179,7 @@ def get_download_url(_user_info):
     def get_url_from_content(content):
         global start_label
         _photo_lst = []
-        if has_retweet or has_highlights or text_save:
+        if has_retweet or has_highlights:
             x_label = 'content'
         else:
             x_label = 'item'
@@ -212,9 +211,7 @@ def get_download_url(_user_info):
                                 name = a2['name']
                                 screen_name = a2['screen_name']
                             if 'extended_entities' in a:
-                                _photo_lst += [(get_heighest_video_quality(_media['video_info']['variants']), f'{timestr}-vid', [tweet_msecs, name, f'@{screen_name}', f'https://x.com/{screen_name}/status/{a["id_str"]}', 'Video', get_heighest_video_quality(_media['video_info']['variants']), '', a['full_text']] + frr) if 'video_info' in _media and has_video else (_media['media_url_https'], f'{timestr}-img', [tweet_msecs, name, f'@{screen_name}', f'https://x.com/{screen_name}/status/{a["id_str"]}', 'Image', _media['media_url_https'], '', a['full_text']] + frr) for _media in a['extended_entities']['media']]
-                            elif text_save: # 无媒体内容
-                                _photo_lst += [('', '', [tweet_msecs, name, f'@{screen_name}', f'https://x.com/{screen_name}/status/{a["id_str"]}', 'Text', '', '', a['full_text']] + frr)]
+                                _photo_lst += [(get_heighest_video_quality(_media['video_info']['variants']), f'{timestr}-vid', [tweet_msecs, name, f'@{screen_name}', _media['expanded_url'], 'Video', get_heighest_video_quality(_media['video_info']['variants']), '', a['full_text']] + frr) if 'video_info' in _media and has_video else (_media['media_url_https'], f'{timestr}-img', [tweet_msecs, name, f'@{screen_name}', _media['expanded_url'], 'Image', _media['media_url_https'], '', a['full_text']] + frr) for _media in a['extended_entities']['media']]
 
                         elif has_retweet:
                             name = a['retweeted_status_result']['result']['core']['user_results']['result']['legacy']['name']
@@ -223,9 +220,8 @@ def get_download_url(_user_info):
                             id_str = a['retweeted_status_result']['result']['legacy']['id_str']
                             
                             if 'extended_entities' in a['retweeted_status_result']['result']['legacy']:
-                                _photo_lst += [(get_heighest_video_quality(_media['video_info']['variants']), f'{timestr}-vid-retweet', [tweet_msecs, name, f"@{screen_name}", f'https://x.com/{screen_name}/status/{id_str}', 'Video', get_heighest_video_quality(_media['video_info']['variants']), '', full_text] + frr) if 'video_info' in _media and has_video else (_media['media_url_https'], f'{timestr}-img-retweet', [tweet_msecs, name, f"@{screen_name}", f'https://x.com/{screen_name}/status/{id_str}', 'Image', _media['media_url_https'], '', full_text] + frr) for _media in a['retweeted_status_result']['result']['legacy']['extended_entities']['media']]
-                            elif text_save: # 无媒体内容
-                                _photo_lst += [('', 'retweet', [tweet_msecs, name, f'@{screen_name}', f'https://x.com/{screen_name}/status/{id_str}', 'Text', '', '', full_text] + frr)]
+                                _photo_lst += [(get_heighest_video_quality(_media['video_info']['variants']), f'{timestr}-vid-retweet', [tweet_msecs, name, f"@{screen_name}", _media['expanded_url'], 'Video', get_heighest_video_quality(_media['video_info']['variants']), '', full_text] + frr) if 'video_info' in _media and has_video else (_media['media_url_https'], f'{timestr}-img-retweet', [tweet_msecs, name, f"@{screen_name}", _media['expanded_url'], 'Image', _media['media_url_https'], '', full_text] + frr) for _media in a['retweeted_status_result']['result']['legacy']['extended_entities']['media']]
+
                     elif not _result[1]:    #已超出目标时间范围
                         start_label = False
                         break
@@ -244,9 +240,7 @@ def get_download_url(_user_info):
                     _result = time_comparison(tweet_msecs, start_time_stamp, end_time_stamp)
                     if _result[0]:  #符合时间限制
                         if 'extended_entities' in a:
-                            _photo_lst += [(get_heighest_video_quality(_media['video_info']['variants']), f'{timestr}-vid', [tweet_msecs, _user_info.name, f'@{_user_info.screen_name}', f'https://x.com/{_user_info.screen_name}/status/{a["id_str"]}', 'Video', get_heighest_video_quality(_media['video_info']['variants']), '', a['full_text']] + frr) if 'video_info' in _media and has_video else (_media['media_url_https'], f'{timestr}-img', [tweet_msecs, _user_info.name, f'@{_user_info.screen_name}', f'https://x.com/{_user_info.screen_name}/status/{a["id_str"]}', 'Image', _media['media_url_https'], '', a['full_text']] + frr) for _media in a['extended_entities']['media']]
-                        elif text_save: # 无媒体内容
-                            _photo_lst += [('', '', [tweet_msecs, _user_info.name, f'@{_user_info.screen_name}', f'https://x.com/{_user_info.screen_name}/status/{a["id_str"]}', 'Text', '', '', a['full_text']] + frr)]
+                            _photo_lst += [(get_heighest_video_quality(_media['video_info']['variants']), f'{timestr}-vid', [tweet_msecs, _user_info.name, f'@{_user_info.screen_name}', _media['expanded_url'], 'Video', get_heighest_video_quality(_media['video_info']['variants']), '', a['full_text']] + frr) if 'video_info' in _media and has_video else (_media['media_url_https'], f'{timestr}-img', [tweet_msecs, _user_info.name, f'@{_user_info.screen_name}', _media['expanded_url'], 'Image', _media['media_url_https'], '', a['full_text']] + frr) for _media in a['extended_entities']['media']]
                     elif not _result[1]:    #已超出目标时间范围
                         start_label = False
                         break
@@ -258,15 +252,14 @@ def get_download_url(_user_info):
 
         return _photo_lst
 
-    
-    print(f'已抓取推文:{_user_info.count}' if text_save else f'已下载图片/视频:{_user_info.count}')
+    print(f'已下载图片/视频:{_user_info.count}')
     if has_highlights: ##2024-01-05 #适配[亮点]标签
         url_top = 'https://twitter.com/i/api/graphql/w9-i9VNm_92GYFaiyGT1NA/UserHighlightsTweets?variables={"userId":"' + _user_info.rest_id + '","count":20,'
         url_bottom = '"includePromotedContent":true,"withVoice":true}&features={"responsive_web_graphql_exclude_directive_enabled":true,"verified_phone_label_enabled":false,"creator_subscriptions_tweet_preview_api_enabled":true,"responsive_web_graphql_timeline_navigation_enabled":true,"responsive_web_graphql_skip_user_profile_image_extensions_enabled":false,"c9s_tweet_anatomy_moderator_badge_enabled":true,"tweetypie_unmention_optimization_enabled":true,"responsive_web_edit_tweet_api_enabled":true,"graphql_is_translatable_rweb_tweet_is_translatable_enabled":true,"view_counts_everywhere_api_enabled":true,"longform_notetweets_consumption_enabled":true,"responsive_web_twitter_article_tweet_consumption_enabled":false,"tweet_awards_web_tipping_enabled":false,"freedom_of_speech_not_reach_fetch_enabled":true,"standardized_nudges_misinfo":true,"tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled":true,"rweb_video_timestamps_enabled":true,"longform_notetweets_rich_text_read_enabled":true,"longform_notetweets_inline_media_enabled":true,"responsive_web_media_download_video_enabled":false,"responsive_web_enhance_cards_enabled":false}'
     elif has_likes:
         url_top = 'https://twitter.com/i/api/graphql/-fbTO1rKPa3nO6-XIRgEFQ/Likes?variables={"userId":"' + _user_info.rest_id + '","count":200,'
         url_bottom = '"includePromotedContent":false,"withClientEventToken":false,"withBirdwatchNotes":false,"withVoice":true,"withV2Timeline":true}&features={"responsive_web_graphql_exclude_directive_enabled":true,"verified_phone_label_enabled":false,"creator_subscriptions_tweet_preview_api_enabled":true,"responsive_web_graphql_timeline_navigation_enabled":true,"responsive_web_graphql_skip_user_profile_image_extensions_enabled":false,"c9s_tweet_anatomy_moderator_badge_enabled":true,"tweetypie_unmention_optimization_enabled":true,"responsive_web_edit_tweet_api_enabled":true,"graphql_is_translatable_rweb_tweet_is_translatable_enabled":true,"view_counts_everywhere_api_enabled":true,"longform_notetweets_consumption_enabled":true,"responsive_web_twitter_article_tweet_consumption_enabled":false,"tweet_awards_web_tipping_enabled":false,"freedom_of_speech_not_reach_fetch_enabled":true,"standardized_nudges_misinfo":true,"tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled":true,"rweb_video_timestamps_enabled":true,"longform_notetweets_rich_text_read_enabled":true,"longform_notetweets_inline_media_enabled":true,"responsive_web_media_download_video_enabled":false,"responsive_web_enhance_cards_enabled":false}'
-    elif has_retweet or text_save:     #包含转推调用[UserTweets]的API(调用一次上限返回20条)
+    elif has_retweet:     #包含转推调用[UserTweets]的API(调用一次上限返回20条)
         url_top = 'https://twitter.com/i/api/graphql/2GIWTr7XwadIixZDtyXd4A/UserTweets?variables={"userId":"' + _user_info.rest_id + '","count":20,'
         url_bottom = '"includePromotedContent":false,"withQuickPromoteEligibilityTweetFields":true,"withVoice":true,"withV2Timeline":true}&features={"rweb_lists_timeline_redesign_enabled":true,"responsive_web_graphql_exclude_directive_enabled":true,"verified_phone_label_enabled":false,"creator_subscriptions_tweet_preview_api_enabled":true,"responsive_web_graphql_timeline_navigation_enabled":true,"responsive_web_graphql_skip_user_profile_image_extensions_enabled":false,"tweetypie_unmention_optimization_enabled":true,"responsive_web_edit_tweet_api_enabled":true,"graphql_is_translatable_rweb_tweet_is_translatable_enabled":true,"view_counts_everywhere_api_enabled":true,"longform_notetweets_consumption_enabled":true,"responsive_web_twitter_article_tweet_consumption_enabled":false,"tweet_awards_web_tipping_enabled":false,"freedom_of_speech_not_reach_fetch_enabled":true,"standardized_nudges_misinfo":true,"tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled":true,"longform_notetweets_rich_text_read_enabled":true,"longform_notetweets_inline_media_enabled":true,"responsive_web_media_download_video_enabled":false,"responsive_web_enhance_cards_enabled":false}&fieldToggles={"withAuxiliaryUserLabels":false,"withArticleRichContentState":false}'
     else:       #不包含转推则调用[UserMedia]的API(返回条数貌似无上限/改count) ##2023-12-11#此模式API返回值变动
@@ -292,21 +285,21 @@ def get_download_url(_user_info):
             return
         if has_highlights:  #亮点模式
             raw_data = raw_data['data']['user']['result']['timeline']['timeline']['instructions'][-1]['entries']
-        elif has_retweet or text_save:   #与likes共用
+        elif has_retweet:   #与likes共用
             raw_data = raw_data['data']['user']['result']['timeline_v2']['timeline']['instructions'][-1]['entries']
         else:   #usermedia模式
             raw_data = raw_data['data']['user']['result']['timeline_v2']['timeline']['instructions']
-        if (has_retweet or has_highlights or text_save) and 'cursor-top' in raw_data[0]['entryId']:      #含转推模式 所有推文已全部下载完成
+        if (has_retweet or has_highlights) and 'cursor-top' in raw_data[0]['entryId']:      #含转推模式 所有推文已全部下载完成
             return False
         
-        if not has_retweet and not has_highlights and not text_save:     #usermedia模式下的下一页请求编号
+        if not has_retweet and not has_highlights:     #usermedia模式下的下一页请求编号
             for i in raw_data[-1]['entries']:
                 if 'bottom' in i['entryId']:
                     _user_info.cursor = i['content']['value']
             # _user_info.cursor = raw_data[-1]['entries'][0]['content']['value']
         
         if start_label:     #判断是否超出时间范围
-            if not has_retweet and not has_highlights and not text_save:
+            if not has_retweet and not has_highlights:
                 global First_Page
                 if First_Page:   #第一页的返回值需特殊处理
                     raw_data = raw_data[-1]['entries'][0]['content']['items']
@@ -383,7 +376,7 @@ def download_control(_user_info):
                             print(f'{_file_name}=====>第{count}次下载失败，已跳过该文件。')
                             print(url)
                             break
-                        print(f'{_file_name}=====>第{count}次下载失败,正在重试(多次失败时请降低main.py第17行-异步模式)')
+                        print(f'{_file_name}=====>第{count}次下载失败,正在重试')
                         print(url)
                     else:
                         url = url.replace('name=orig', 'name=4096x4096')
@@ -394,15 +387,11 @@ def download_control(_user_info):
                 break
             elif photo_lst[0] == True:
                 continue
-            if async_down:
-                semaphore = asyncio.Semaphore(max_concurrent_requests)    #最大并发数量，默认为8，对自己网络有自信的可以调高
-                if down_log:
-                    await asyncio.gather(*[asyncio.create_task(down_save(url[0], url[1], url[2], order)) for order,url in enumerate(photo_lst) if cache_data.is_present(url[0])])
-                else:
-                    await asyncio.gather(*[asyncio.create_task(down_save(url[0], url[1], url[2], order)) for order,url in enumerate(photo_lst)])
+            semaphore = asyncio.Semaphore(max_concurrent_requests)    #最大并发数量，默认为8，对自己网络有自信的可以调高
+            if down_log:
+                await asyncio.gather(*[asyncio.create_task(down_save(url[0], url[1], url[2], order)) for order,url in enumerate(photo_lst) if cache_data.is_present(url[0])])
             else:
-                for order,url in enumerate(photo_lst):
-                    await down_save(url[0], url[1], url[2], order)
+                await asyncio.gather(*[asyncio.create_task(down_save(url[0], url[1], url[2], order)) for order,url in enumerate(photo_lst)])
             _user_info.count += len(photo_lst)      #更新计数
 
     asyncio.run(_main())
