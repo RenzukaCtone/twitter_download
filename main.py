@@ -139,8 +139,9 @@ def get_other_info(_user_info):
         _user_info.name = raw_data['data']['user']['result']['legacy']['name']
         _user_info.statuses_count = raw_data['data']['user']['result']['legacy']['statuses_count']
         _user_info.media_count = raw_data['data']['user']['result']['legacy']['media_count']
-    except Exception:
+    except Exception as e:
         print('获取信息失败')
+        print(e)
         print(response)
         return False
     return True
@@ -149,7 +150,7 @@ def print_info(_user_info):
     print(
         f'''
         <======基本信息=====>
-        昵称:{_user_info.name}
+        昵称:{_user_info.name.encode('utf-8', errors='replace').decode('utf-8')}
         用户名:{_user_info.screen_name}
         数字ID:{_user_info.rest_id}
         总推数(含转推):{_user_info.statuses_count}
