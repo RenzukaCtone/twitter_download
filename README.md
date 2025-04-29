@@ -3,6 +3,8 @@
 - 支持在 main.py 中爬取纯文本推文并保存至 csv/md，通过 settings.json 中的 text_save 来启用/禁用。
 与获取转推共用 API，因此也会消耗大量API调用次数。
 - 在抓取后会立即将所有抓取信息按顺序存入 csv，即使媒体文件还未开始下载。
+- Ctrl + C 中断程序时，若已启用 down_log，则会先将已下载的内容存入 cache_data.log 再退出程序。
+- 若已启用 down_log，跳过已下载的图片时会提示。
 
 ---
 
