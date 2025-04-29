@@ -6,6 +6,7 @@ import asyncio
 import os
 import json
 import sys
+import signal
 
 sys.path.append('.')
 from user_info import User_info
@@ -396,7 +397,13 @@ def download_control(_user_info):
                 continue
             semaphore = asyncio.Semaphore(max_concurrent_requests)    #最大并发数量，默认为8，对自己网络有自信的可以调高
             if down_log:
-                await asyncio.gather(*[asyncio.create_task(down_save(url[0], url[1], url[2], order)) for order,url in enumerate(photo_lst) if cache_data.is_present(url[0])])
+                new_photo_lst = []
+                for x in photo_lst:
+                    if cache_data.is_present(x[0]):
+                        new_photo_lst.append(x)
+                    else:
+                        print("Skipped " + x[0])
+                await asyncio.gather(*[asyncio.create_task(down_save(url[0], url[1], url[2], order)) for order,url in enumerate(new_photo_lst)])
             else:
                 await asyncio.gather(*[asyncio.create_task(down_save(url[0], url[1], url[2], order)) for order,url in enumerate(photo_lst)])
             _user_info.count += len(photo_lst)      #更新计数
@@ -452,11 +459,19 @@ def main(_user_info: object):
     if md_output:
         md_file.md_close()
 
-    if down_log:
+    if down_log and cache_data:
         del cache_data
     print(f'{_user_info.name}下载完成\n\n')
 
+def signal_handler(sig, frame):
+    if down_log:
+        global cache_data
+        if cache_data:
+            del cache_data
+    sys.exit(0)
+
 if __name__=='__main__':
+    signal.signal(signal.SIGINT, signal_handler)
     _start = time.time()
     for i in settings['user_lst'].split(','):
         main(User_info(i))
