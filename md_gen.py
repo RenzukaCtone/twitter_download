@@ -12,8 +12,7 @@ class md_gen():
             self.f.write(f"Tweet Range: {tweet_range}\n")
             self.f.write(f"Save Path: {save_path}\n")
         else:
-            self.current_filename = f'{save_path}/{screen_name}-{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.md'
-            self.f = open(self.current_filename, 'w', encoding='utf-8-sig', newline='')
+            self.f = open(f'{save_path}/{screen_name}-{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.md', 'w', encoding='utf-8-sig', newline='')
             
         self.save_path = save_path
         self.user_name = user_name
@@ -26,26 +25,33 @@ class md_gen():
         self.current_tweet_info = ['', '', ''] # 生成 md 时使用，用于合并多个媒体到一个推文和生成日期标题。0-当前推文的url, 1-当前推文互动数据(md文本), 2-当前推文年月日期(不含转推，获取likes时也不使用)
         self.file_media_count = 0 # 当前文件中的媒体数量
         self.file_count = 1 # 已输出的文件数量
+        
+        self.is_empty_markdown = True
 
     def md_close(self):
         self.f.write('\n' + self.current_tweet_info[1] + '\n') # 输出最后一个推文的互动数据
+        filename = self.f.name
         self.f.close()
+        
+        if self.is_empty_markdown:
+            os.remove(filename)
+            return
         
         concat_filename = f'{self.save_path}/{self.screen_name}_likes.md' if self.has_likes else f'{self.save_path}/{self.screen_name}.md'
         if self.md_concat:
             if os.path.isfile(concat_filename):
                 os.rename(concat_filename, concat_filename + ".temp")
-                shutil.copyfile(self.current_filename, concat_filename)
+                shutil.copyfile(self.f.name, concat_filename)
                 tempfile = open(concat_filename + ".temp", 'r', encoding='utf-8-sig')
                 concatfile = open(concat_filename, 'a', encoding='utf-8-sig')
-                oncatfile.write('\n')
+                concatfile.write('\n')
                 for lines in tempfile:
                     concatfile.write(lines)
                 tempfile.close()
                 concatfile.close()
                 os.remove(concat_filename + ".temp")
             else:
-                shutil.copyfile(self.current_filename, concat_filename)
+                shutil.copyfile(self.f.name, concat_filename)
 
     def stamp2time(self, msecs_stamp:int) -> str:
         timeArray = time.localtime(msecs_stamp/1000)
@@ -53,6 +59,8 @@ class md_gen():
         return otherStyleTime
 
     def text_tweet_input(self, csv_info, prefix, downloaded_profile) -> None:
+        self.is_empty_markdown = False
+        
         fixed_timestr = csv_info[0] if type(csv_info[0]) == str else self.stamp2time(csv_info[0])
         prefix_retweet = f'*{self.user_name} retweeted*\n' if 'retweet' in prefix else ''
         profile_image = f'<img src="{downloaded_profile[1]}" style="width:70px; height:auto;" class="profile_image">'
@@ -68,6 +76,8 @@ class md_gen():
         self.current_tweet_info[1] = f'{csv_info[8]} Likes, {csv_info[9]} Retweets, {csv_info[10]} Replies'
         
     def media_tweet_input(self, csv_info, prefix, downloaded_profile) -> None:
+        self.is_empty_markdown = False
+        
         fixed_filename = csv_info[6].replace(' ', '%20')
         fixed_timestr = csv_info[0] if type(csv_info[0]) == str else self.stamp2time(csv_info[0])
         currentDate = fixed_timestr[0:7]
