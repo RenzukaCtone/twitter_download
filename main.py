@@ -447,6 +447,7 @@ def download_control(_user_info):
 
         while True:
             photo_lst = get_download_url(_user_info)
+            finished_downloading = False
             if not photo_lst:
                 break
             elif photo_lst[0] == True:
@@ -464,7 +465,10 @@ def download_control(_user_info):
                             print("Skipped " + x[0])
                             combo_skipped += 1
                             if(combo_skipped > 25 and has_likes):
+                                finished_downloading = True
                                 break
+                if finished_downloading:
+                    break
                 await asyncio.gather(*[asyncio.create_task(down_save(url[0], url[1], url[2], order)) for order,url in enumerate(new_photo_lst)])
             else:
                 await asyncio.gather(*[asyncio.create_task(down_save(url[0], url[1], url[2], order)) for order,url in enumerate(photo_lst)])
