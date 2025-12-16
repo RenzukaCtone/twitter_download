@@ -240,7 +240,7 @@ def get_download_url(_user_info):
                                 with open(f"{_user_info.save_path}{os.sep}profile_data{os.sep}{screen_name}-{download_time_str}.json", 'w', encoding='utf-8-sig') as f:
                                     f.write(json.dumps(a2, ensure_ascii=False))
                             if f'@{screen_name}' not in downloaded_profile and profile_image_url_https != '':
-                                _photo_lst += [(profile_image_url_https, f'{name}-{timestr}', [tweet_msecs, name, f'@{screen_name}'])]
+                                _photo_lst += [(profile_image_url_https, f'{screen_name}-{timestr}', [tweet_msecs, name, f'@{screen_name}'])]
                                 downloaded_profile[f'@{screen_name}'] = ['', '']
                             if 'extended_entities' in a:
                                 _photo_lst += [(get_heighest_video_quality(_media['video_info']['variants']), f'{timestr}-vid', [tweet_msecs, name, f'@{screen_name}', _media['expanded_url'], 'Video', get_heighest_video_quality(_media['video_info']['variants']), '', a['full_text']] + frr) if 'video_info' in _media and has_video else (_media['media_url_https'], f'{timestr}-img', [tweet_msecs, name, f'@{screen_name}', _media['expanded_url'], 'Image', _media['media_url_https'], '', a['full_text']] + frr) for _media in a['extended_entities']['media']]
