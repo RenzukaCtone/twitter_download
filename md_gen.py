@@ -1,21 +1,28 @@
 import time
 import re
+import os
+import shutil
 from datetime import datetime
 
 class md_gen():
-    def __init__(self, save_path:str, user_name, screen_name, tweet_range, has_likes, media_count_limit) -> None:
-        self.f = open(f'{save_path}/{screen_name}-{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}_1.md', 'w', encoding='utf-8-sig', newline='')
-        self.f.write(f"{user_name} {screen_name}\n")
-        self.f.write(f"Tweet Range: {tweet_range}\n")
-        self.f.write(f"Save Path: {save_path}\n")
-        
+    def __init__(self, save_path:str, user_name, screen_name, tweet_range, has_likes, media_count_limit, md_concat) -> None:
+        if md_concat == False:
+            self.f = open(f'{save_path}/{screen_name}-{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}_1.md', 'w', encoding='utf-8-sig', newline='')
+            self.f.write(f"{user_name} {screen_name}\n")
+            self.f.write(f"Tweet Range: {tweet_range}\n")
+            self.f.write(f"Save Path: {save_path}\n")
+        else:
+            self.current_filename = f'{save_path}/{screen_name}-{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.md'
+            self.f = open(self.current_filename, 'w', encoding='utf-8-sig', newline='')
+            
         self.save_path = save_path
         self.user_name = user_name
         self.screen_name = screen_name
         self.tweet_range = tweet_range
         self.has_likes = has_likes
+        self.md_concat = md_concat
         
-        self.media_count_limit = media_count_limit # 从配置文件中读取到的 单个 Markdown 最大媒体数量。
+        self.media_count_limit = media_count_limit if md_concat == False else 0 # 从配置文件中读取到的 单个 Markdown 最大媒体数量。
         self.current_tweet_info = ['', '', ''] # 生成 md 时使用，用于合并多个媒体到一个推文和生成日期标题。0-当前推文的url, 1-当前推文互动数据(md文本), 2-当前推文年月日期(不含转推，获取likes时也不使用)
         self.file_media_count = 0 # 当前文件中的媒体数量
         self.file_count = 1 # 已输出的文件数量
@@ -23,30 +30,49 @@ class md_gen():
     def md_close(self):
         self.f.write('\n' + self.current_tweet_info[1] + '\n') # 输出最后一个推文的互动数据
         self.f.close()
+        
+        concat_filename = f'{self.save_path}/{self.screen_name}_likes.md' if self.has_likes else f'{self.save_path}/{self.screen_name}.md'
+        if self.md_concat:
+            if os.path.isfile(concat_filename):
+                os.rename(concat_filename, concat_filename + ".temp")
+                shutil.copyfile(self.current_filename, concat_filename)
+                tempfile = open(concat_filename + ".temp", 'r', encoding='utf-8-sig')
+                concatfile = open(concat_filename, 'a', encoding='utf-8-sig')
+                oncatfile.write('\n')
+                for lines in tempfile:
+                    concatfile.write(lines)
+                tempfile.close()
+                concatfile.close()
+                os.remove(concat_filename + ".temp")
+            else:
+                shutil.copyfile(self.current_filename, concat_filename)
 
     def stamp2time(self, msecs_stamp:int) -> str:
         timeArray = time.localtime(msecs_stamp/1000)
         otherStyleTime = time.strftime("%Y-%m-%d %H:%M", timeArray)
         return otherStyleTime
 
-    def text_tweet_input(self, csv_info, prefix) -> None:
+    def text_tweet_input(self, csv_info, prefix, downloaded_profile) -> None:
         fixed_timestr = csv_info[0] if type(csv_info[0]) == str else self.stamp2time(csv_info[0])
         prefix_retweet = f'*{self.user_name} retweeted*\n' if 'retweet' in prefix else ''
+        profile_image = f'<img src="{downloaded_profile[1]}" style="width:70px; height:auto;" class="profile_image">'
         
         currentDate = fixed_timestr[0:7]
         if not self.has_likes and 'retweet' not in prefix and currentDate != self.current_tweet_info[2]:
             self.f.write(f'## {currentDate}\n')
             self.current_tweet_info[2] = currentDate
         self.f.write(f'\n{self.current_tweet_info[1]}\n\n' if len(self.current_tweet_info[1]) > 0 else '') # 输出上一个推文的互动数据
-        self.f.write(f'{prefix_retweet}{csv_info[1]} {csv_info[2]} · {fixed_timestr} [src]({csv_info[3]})\n')
+        self.f.write(f'{prefix_retweet}{profile_image}{csv_info[1]} {csv_info[2]} · {fixed_timestr} [src]({csv_info[3]})\n')
         self.f.write(csv_info[7])
         self.current_tweet_info[0] = csv_info[3]
         self.current_tweet_info[1] = f'{csv_info[8]} Likes, {csv_info[9]} Retweets, {csv_info[10]} Replies'
         
-    def media_tweet_input(self, csv_info, prefix) -> None:
+    def media_tweet_input(self, csv_info, prefix, downloaded_profile) -> None:
         fixed_filename = csv_info[6].replace(' ', '%20')
         fixed_timestr = csv_info[0] if type(csv_info[0]) == str else self.stamp2time(csv_info[0])
         currentDate = fixed_timestr[0:7]
+        
+        profile_image = f'<img src="{downloaded_profile[1]}" style="width:70px; height:auto;" class="profile_image">'
 
         if self.current_tweet_info[0] != csv_info[3]: # 检测到现在正准备输出新的推文
             self.f.write(f'\n{self.current_tweet_info[1]}\n\n' if len(self.current_tweet_info[1]) > 0 else '') # 输出上一个推文的互动数据
@@ -71,7 +97,7 @@ class md_gen():
                 self.current_tweet_info[2] = currentDate
 
             prefix_retweet = f'*{self.user_name} retweeted*\n' if 'retweet' in prefix else '' # 转推注释
-            self.f.write(f'{prefix_retweet}{csv_info[1]} {csv_info[2]} · {fixed_timestr} [src]({csv_info[3]})\n') # 推文用户名与昵称
+            self.f.write(f'{prefix_retweet}{profile_image}{csv_info[1]} {csv_info[2]} · {fixed_timestr} [src]({csv_info[3]})\n') # 推文用户名与昵称
             self.f.write(csv_info[7] + '\n') # 推文文本信息
             self.current_tweet_info[0] = csv_info[3]
             self.current_tweet_info[1] = f'{csv_info[8]} Likes, {csv_info[9]} Retweets, {csv_info[10]} Replies'

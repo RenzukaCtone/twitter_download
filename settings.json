@@ -52,6 +52,9 @@
     
     "text_save": true,
     "text_save_info": "是否抓取无媒体的推文（纯文本推文）。与获取转推共用 API，因此也会消耗大量API调用次数。",
+	
+	"md_concat": true,
+	"md_concat_info": "自用。对同一用户输出 Markdown 时，将追加到已存在文件的头部。文件名格式：{username}[_likes].md。",
     
     "media_count_limit": 350,
     "media_count_limit_info": "限制单个 Markdown 文件中包含媒体的数量，避免内存爆炸。默认为 350，配置较差的可以适当降低，填 0 则不限制(所有媒体标签输出到一个文件中)。",
