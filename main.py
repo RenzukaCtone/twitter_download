@@ -536,12 +536,15 @@ def main(_user_info: object):
         del cache_data
     print(f'{_user_info.name}下载完成\n\n')
 
+
+"""
 def signal_handler(sig, frame):
     if down_log:
         global cache_data
         if cache_data:
             del cache_data
     sys.exit(0)
+"""
 
 if __name__=='__main__':
     signal.signal(signal.SIGINT, signal_handler)
