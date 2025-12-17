@@ -547,7 +547,7 @@ def signal_handler(sig, frame):
 """
 
 if __name__=='__main__':
-    signal.signal(signal.SIGINT, signal_handler)
+    #signal.signal(signal.SIGINT, signal_handler)
     _start = time.time()
     for i in settings['user_lst'].split(','):
         main(User_info(i))
