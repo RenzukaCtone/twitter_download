@@ -464,7 +464,7 @@ def download_control(_user_info):
                         elif "profile" not in x[0]:
                             print("Skipped " + x[0])
                             combo_skipped += 1
-                            if(combo_skipped > 25 and has_likes):
+                            if(combo_skipped > 25):
                                 finished_downloading = True
                                 break
                 if finished_downloading:
