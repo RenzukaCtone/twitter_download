@@ -8,7 +8,13 @@ class User_info():
         self.media_count = None  #含图片视频的推数(不含转推)
 
         self.save_path = None
+        self.temp_path = None
         self.cursor = None       #下一页
         self.count = 0           #已获取计数,用于计算进度
+        
+        self.profile_image_url_https = None
+        self.profile_banner_url = None
+        self.description = None
+        self.created_at = None
         
         pass

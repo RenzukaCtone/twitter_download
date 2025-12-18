@@ -7,6 +7,7 @@ import os
 import json
 import sys
 import signal
+import shutil
 
 sys.path.append('.')
 from user_info import User_info
@@ -160,6 +161,9 @@ def get_other_info(_user_info):
         _user_info.profile_banner_url = raw_data['data']['user']['result']['legacy']['profile_banner_url'] if 'profile_banner_url' in raw_data['data']['user']['result']['legacy'] else None
         _user_info.description = raw_data['data']['user']['result']['legacy']['description']
         _user_info.created_at = raw_data['data']['user']['result']['legacy']['created_at']
+        
+        with open(f"{_user_info.temp_path}{os.sep}profile_data{os.sep}{_user_info.screen_name}-{download_time_str}.json", 'w', encoding='utf-8-sig') as f:
+            f.write(json.dumps(raw_data, ensure_ascii=False))
     except Exception as e:
         print('获取信息失败')
         print(e)
@@ -219,13 +223,21 @@ def get_download_url(_user_info):
                         frr = [a['favorite_count'], a['retweet_count'], a['reply_count']]
                         tweet_msecs = int(i[x_label]['itemContent']['tweet_results']['result']['edit_control']['editable_until_msecs']) - 3600000
                     timestr = stamp2time(tweet_msecs)
+                    
+                    global downloaded_profile
+                    
+                    if f'@{_user_info.screen_name}' not in downloaded_profile:
+                        if _user_info.profile_image_url_https != '':
+                            _photo_lst += [(_user_info.profile_image_url_https, f'{_user_info.screen_name}-{download_time_str}', [tweet_msecs, _user_info.name, f'@{_user_info.screen_name}'])]
+                        if _user_info.profile_banner_url != '':
+                            _photo_lst += [(_user_info.profile_banner_url, f'{_user_info.screen_name}-{download_time_str}', [tweet_msecs, _user_info.name, f'@{_user_info.screen_name}'])]
+                        downloaded_profile[f'@{_user_info.screen_name}'] = ['', '']
 
                     #我知道这边代码很烂
                     #但我实在不想重构 ( º﹃º )
 
                     _result = time_comparison(tweet_msecs, start_time_stamp, end_time_stamp)
                     
-                    global downloaded_profile
                     if _result[0]:  #符合时间限制
                         if 'retweeted_status_result' not in a : #判断是否为转推,以及是否获取转推
                             name = _user_info.name
@@ -237,11 +249,14 @@ def get_download_url(_user_info):
                                 name = a2['name']
                                 screen_name = a2['screen_name']
                                 profile_image_url_https = a2['profile_image_url_https']
-                                with open(f"{_user_info.save_path}{os.sep}profile_data{os.sep}{screen_name}-{download_time_str}.json", 'w', encoding='utf-8-sig') as f:
-                                    f.write(json.dumps(a2, ensure_ascii=False))
-                            if f'@{screen_name}' not in downloaded_profile and profile_image_url_https != '':
-                                _photo_lst += [(profile_image_url_https, f'{screen_name}-{timestr}', [tweet_msecs, name, f'@{screen_name}'])]
-                                downloaded_profile[f'@{screen_name}'] = ['', '']
+                                
+                                if f'@{screen_name}' not in downloaded_profile:
+                                    with open(f"{_user_info.temp_path}{os.sep}profile_data{os.sep}{screen_name}-{download_time_str}.json", 'w', encoding='utf-8-sig') as f:
+                                        f.write(json.dumps(a2, ensure_ascii=False))
+                                    if profile_image_url_https != '':
+                                        _photo_lst += [(profile_image_url_https, f'{screen_name}-{download_time_str}', [tweet_msecs, name, f'@{screen_name}'])]
+                                    downloaded_profile[f'@{screen_name}'] = ['', '']
+                                
                             if 'extended_entities' in a:
                                 _photo_lst += [(get_heighest_video_quality(_media['video_info']['variants']), f'{timestr}-vid', [tweet_msecs, name, f'@{screen_name}', _media['expanded_url'], 'Video', get_heighest_video_quality(_media['video_info']['variants']), '', a['full_text']] + frr) if 'video_info' in _media and has_video else (_media['media_url_https'], f'{timestr}-img', [tweet_msecs, name, f'@{screen_name}', _media['expanded_url'], 'Image', _media['media_url_https'], '', a['full_text']] + frr) for _media in a['extended_entities']['media']]
                             elif text_save: # 无媒体内容
@@ -255,11 +270,11 @@ def get_download_url(_user_info):
                             
                             profile_image_url_https = a['retweeted_status_result']['result']['core']['user_results']['result']['legacy']['profile_image_url_https']
                             
-                            with open(f"{_user_info.save_path}{os.sep}profile_data{os.sep}{screen_name}-{download_time_str}.json", 'w', encoding='utf-8-sig') as f:
-                                f.write(json.dumps(a['retweeted_status_result']['result']['legacy'], ensure_ascii=False))
-                            
-                            if f'@{screen_name}' not in downloaded_profile and profile_image_url_https != '':
-                                _photo_lst += [(profile_image_url_https, f'{screen_name}-{timestr}', [tweet_msecs, name, f'@{screen_name}'])]
+                            if f'@{screen_name}' not in downloaded_profile:
+                                with open(f"{_user_info.temp_path}{os.sep}profile_data{os.sep}{screen_name}-{download_time_str}.json", 'w', encoding='utf-8-sig') as f:
+                                    f.write(json.dumps(a['retweeted_status_result']['result']['legacy'], ensure_ascii=False))
+                                if profile_image_url_https != '':
+                                    _photo_lst += [(profile_image_url_https, f'{screen_name}-{download_time_str}', [tweet_msecs, name, f'@{screen_name}'])]
                                 downloaded_profile[f'@{screen_name}'] = ['', '']
                             if 'extended_entities' in a['retweeted_status_result']['result']['legacy'] and screen_name != _user_info.screen_name:
                                 _photo_lst += [(get_heighest_video_quality(_media['video_info']['variants']), f'{timestr}-vid-retweet', [tweet_msecs, name, f"@{screen_name}", _media['expanded_url'], 'Video', get_heighest_video_quality(_media['video_info']['variants']), '', full_text] + frr) if 'video_info' in _media and has_video else (_media['media_url_https'], f'{timestr}-img-retweet', [tweet_msecs, name, f"@{screen_name}", _media['expanded_url'], 'Image', _media['media_url_https'], '', full_text] + frr) for _media in a['retweeted_status_result']['result']['legacy']['extended_entities']['media']]
@@ -283,9 +298,6 @@ def get_download_url(_user_info):
 
                     _result = time_comparison(tweet_msecs, start_time_stamp, end_time_stamp)
                     if _result[0]:  #符合时间限制
-                        if f'@{_user_info.screen_name}' not in downloaded_profile and _user_info.profile_image_url_https != '':
-                            _photo_lst += [(_user_info.profile_image_url_https, f'{name}-{timestr}', [tweet_msecs, name, f'@{screen_name}'])]
-                            downloaded_profile[f'@{screen_name}'] = ['', '']
                         if 'extended_entities' in a:
                             _photo_lst += [(get_heighest_video_quality(_media['video_info']['variants']), f'{timestr}-vid', [tweet_msecs, _user_info.name, f'@{_user_info.screen_name}', _media['expanded_url'], 'Video', get_heighest_video_quality(_media['video_info']['variants']), '', a['full_text']] + frr) if 'video_info' in _media and has_video else (_media['media_url_https'], f'{timestr}-img', [tweet_msecs, _user_info.name, f'@{_user_info.screen_name}', _media['expanded_url'], 'Image', _media['media_url_https'], '', a['full_text']] + frr) for _media in a['extended_entities']['media']]
                         elif text_save: # 无媒体内容
@@ -322,7 +334,8 @@ def get_download_url(_user_info):
     print(url)
     try:
         global request_count
-        response = httpx.get(quote_url(url), headers=_headers, proxy=proxies).text
+        conn = httpx.get(quote_url(url), headers=_headers, proxy=proxies)
+        response = conn.text
         request_count += 1
         try:
             raw_data = json.loads(response)
@@ -331,7 +344,7 @@ def get_download_url(_user_info):
                 print('API次数已超限')
             else:
                 print('获取数据失败')
-            print(response)
+            print(conn)
             return
         if has_highlights:  #亮点模式
             raw_data = raw_data['data']['user']['result']['timeline']['timeline']['instructions'][-1]['entries']
@@ -377,21 +390,21 @@ def download_control(_user_info):
         async def down_save(url, prefix, csv_info, order: int):
             global current_tweet_info
             global downloaded_profile
-            _profile_banner = False
             _profile_image = False
-            if 'profile_banner' in url:
-                _profile_banner = True
-                _file_name = f'{_user_info.save_path + os.sep}profile_banners{os.sep}{prefix}.jpg'
-                downloaded_profile[csv_info[2]][0] = f'profile_banners/{prefix}.jpg'
-            elif 'profile_image' in url:
+            _profile_banner = False
+            if 'profile_image' in url:
                 _profile_image = True
                 url = url.replace('_normal', '')
                 url_suffix = re.sub(r".*\.", "", url)
-                _file_name = f'{_user_info.save_path + os.sep}profile_images{os.sep}{prefix}' + '.' + url_suffix
+                _file_name = f'{_user_info.temp_path}{os.sep}profile_images{os.sep}{prefix}' + '.' + url_suffix
                 downloaded_profile[csv_info[2]][1] = f'profile_images/{prefix}.{url_suffix}'
+            elif 'profile_banner' in url:
+                _profile_banner = True
+                _file_name = f'{_user_info.temp_path + os.sep}profile_banners{os.sep}{prefix}'
+                downloaded_profile[csv_info[2]][0] = f'profile_banners/{prefix}'
             elif '.mp4' in url:
-                _file_name = f'{_user_info.save_path + os.sep}{prefix}_{_user_info.count + order}.mp4'
-            elif len(url) == 0 and text_save: # 纯文本内容
+                _file_name = f'{_user_info.temp_path}{os.sep}{prefix}_{_user_info.count + order}.mp4'
+            elif csv_info[4] == "Text" and text_save: # 纯文本内容
                 csv_file.data_input(csv_info)
                 if md_output:
                     md_file.text_tweet_input(csv_info, prefix, downloaded_profile[csv_info[2]])
@@ -400,9 +413,9 @@ def download_control(_user_info):
                 try:
                     if orig_format:
                         url += f'?name=orig'
-                        _file_name = f'{_user_info.save_path + os.sep}{prefix}_{_user_info.count + order}.{csv_info[5][-3:]}' # 根据图片 url 获取原始格式
+                        _file_name = f'{_user_info.temp_path + os.sep}{prefix}_{_user_info.count + order}.{csv_info[5][-3:]}' # 根据图片 url 获取原始格式
                     else: # 指定格式时，先使用 name=orig，404 则切回 name=4096x4096，以保证最大尺寸
-                        _file_name = f'{_user_info.save_path + os.sep}{prefix}_{_user_info.count + order}.{img_format}'
+                        _file_name = f'{_user_info.temp_path + os.sep}{prefix}_{_user_info.count + order}.{img_format}'
                         if img_format != 'png':
                             url += f'?format=jpg&name=4096x4096'
                         else:
@@ -411,7 +424,7 @@ def download_control(_user_info):
                     print(url)
                     return False
 
-            if not _profile_image and not _profile_image:
+            if not _profile_image and not _profile_banner:
                 csv_info[-5] = os.path.split(_file_name)[1]
                 csv_file.data_input(csv_info)
                 if md_output: # 在下载完毕之前先输出到 Markdown，以尽可能保证高并发下载也能得到正确的推文顺序。
@@ -426,6 +439,13 @@ def download_control(_user_info):
                             if response.status_code == 404:
                                 raise Exception('404')
                             down_count += 1
+                    if _profile_banner:
+                        if response.content.startswith(b'\xff\xd8\xff'):
+                            _file_name += '.jpg'
+                            downloaded_profile[csv_info[2]][0] += '.jpg'
+                        elif response.content.startswith(b'\x89PNG\r\n\x1a\n'):
+                            _file_name += 'png'
+                            downloaded_profile[csv_info[2]][0] += '.png'
                     with open(_file_name,'wb') as f:
                         f.write(response.content)
 
@@ -480,29 +500,37 @@ def main(_user_info: object):
     re_token = 'ct0=(.*?);'
     _headers['x-csrf-token'] = re.findall(re_token,_headers['cookie'])[0]
     _headers['referer'] = 'https://twitter.com/' + _user_info.screen_name
-    if not get_other_info(_user_info):
-        return False
-    print_info(_user_info)
+
     _path = settings['save_path'] + _user_info.screen_name
     if not os.path.exists(_path):   #创建文件夹
         os.makedirs(settings['save_path']+_user_info.screen_name)       #用户名建文件夹
         _user_info.save_path = settings['save_path']+_user_info.screen_name
     else:
         _user_info.save_path = _path
-        
-    if not os.path.exists(_path + os.sep + "profile_banners"):   #创建文件夹
-        os.makedirs(_path + os.sep + "profile_banners")
-    if not os.path.exists(_path + os.sep + "profile_images"):   #创建文件夹
-        os.makedirs(_path + os.sep + "profile_images")
-    if not os.path.exists(_path + os.sep + "profile_data"):   #创建文件夹
-        os.makedirs(_path + os.sep + "profile_data")
-        
+
+    _user_info.temp_path = f'{_user_info.save_path}{os.sep}temp_download'
+    if os.path.isdir(_user_info.temp_path):
+        shutil.rmtree(_user_info.temp_path)
+    os.makedirs(_user_info.temp_path)
+
+    os.makedirs(_path + os.sep + "profile_banners", exist_ok=True)
+    os.makedirs(_path + os.sep + "profile_images", exist_ok=True)
+    os.makedirs(_path + os.sep + "profile_data", exist_ok=True)
+    
+    os.makedirs(_user_info.temp_path + os.sep + "profile_banners", exist_ok=True)
+    os.makedirs(_user_info.temp_path + os.sep + "profile_images", exist_ok=True)
+    os.makedirs(_user_info.temp_path + os.sep + "profile_data", exist_ok=True)
+    
+    if not get_other_info(_user_info):
+        return False
+    print_info(_user_info)
+    
     global csv_file
-    csv_file = csv_gen(_user_info.save_path, _user_info.name, _user_info.screen_name, settings['time_range'])
+    csv_file = csv_gen(_user_info.temp_path, _user_info.name, _user_info.screen_name, settings['time_range'])
 
     if md_output:
         global md_file
-        md_file = md_gen(_user_info.save_path, _user_info.name, _user_info.screen_name, settings['time_range'], has_likes, media_count_limit, md_concat)
+        md_file = md_gen(_user_info.save_path, _user_info.temp_path, _user_info.name, _user_info.screen_name, settings['time_range'], has_likes, media_count_limit, md_concat)
 
     if down_log:
         global cache_data
@@ -525,12 +553,20 @@ def main(_user_info: object):
         else:
             start_time_stamp = backup_stamp
 
-    download_control(_user_info)
+    #download_control(_user_info)
 
     csv_file.csv_close()
     
     if md_output:
         md_file.md_close()
+        
+    for f in os.listdir(_user_info.temp_path):
+        if os.path.isfile(os.path.join(_user_info.temp_path, f)):
+            shutil.move(os.path.join(_user_info.temp_path, f), _user_info.save_path)
+        elif os.path.isdir(os.path.join(_user_info.temp_path, f)):
+            for f2 in os.listdir(os.path.join(_user_info.temp_path, f)):
+                if os.path.isfile(os.path.join(_user_info.temp_path, f, f2)):
+                    shutil.move(os.path.join(_user_info.temp_path, f, f2), os.path.join(_user_info.save_path, f))
 
     if down_log and cache_data:
         del cache_data

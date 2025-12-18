@@ -5,16 +5,17 @@ import shutil
 from datetime import datetime
 
 class md_gen():
-    def __init__(self, save_path:str, user_name, screen_name, tweet_range, has_likes, media_count_limit, md_concat) -> None:
+    def __init__(self, save_path:str, temp_path:str, user_name, screen_name, tweet_range, has_likes, media_count_limit, md_concat) -> None:
         if md_concat == False:
-            self.f = open(f'{save_path}/{screen_name}-{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}_1.md', 'w', encoding='utf-8-sig', newline='')
+            self.f = open(f'{temp_path}/{screen_name}-{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}_1.md', 'w', encoding='utf-8-sig', newline='')
             self.f.write(f"{user_name} {screen_name}\n")
             self.f.write(f"Tweet Range: {tweet_range}\n")
             self.f.write(f"Save Path: {save_path}\n")
         else:
-            self.f = open(f'{save_path}/{screen_name}-{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.md', 'w', encoding='utf-8-sig', newline='')
+            self.f = open(f'{temp_path}/{screen_name}-{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.md', 'w', encoding='utf-8-sig', newline='')
             
         self.save_path = save_path
+        self.temp_path = temp_path
         self.user_name = user_name
         self.screen_name = screen_name
         self.tweet_range = tweet_range
@@ -92,15 +93,15 @@ class md_gen():
                 self.file_media_count = 0
                 self.file_count += 1
                 if self.has_likes:
-                    new_filename = f'{self.save_path}/{self.screen_name}-{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}_{self.file_count}.md'
+                    new_filename = f'{self.temp_path}/{self.screen_name}-{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}_{self.file_count}.md'
                 elif 'retweet' in prefix:
-                    new_filename = f'{self.save_path}/{self.screen_name}-{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}_{self.file_count}_{self.current_tweet_info[2]}.md'
+                    new_filename = f'{self.temp_path}/{self.screen_name}-{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}_{self.file_count}_{self.current_tweet_info[2]}.md'
                 else:
-                    new_filename = f'{self.save_path}/{self.screen_name}-{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}_{self.file_count}_{currentDate}.md'
+                    new_filename = f'{self.temp_path}/{self.screen_name}-{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}_{self.file_count}_{currentDate}.md'
                 self.f = open(new_filename, 'w', encoding='utf-8-sig', newline='')
                 self.f.write(f"{self.user_name} {self.screen_name}\n")
                 self.f.write(f"Tweet Range: {self.tweet_range}\n")
-                self.f.write(f"Save Path: {self.save_path}\n\n")
+                self.f.write(f"Save Path: {self.temp_path}\n\n")
 
             if not self.has_likes and 'retweet' not in prefix and currentDate != self.current_tweet_info[2]:
                 self.f.write(f'## {currentDate}\n') # 输出 年月 标题
