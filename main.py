@@ -245,7 +245,7 @@ def get_download_url(_user_info):
                             if 'extended_entities' in a:
                                 _photo_lst += [(get_heighest_video_quality(_media['video_info']['variants']), f'{timestr}-vid', [tweet_msecs, name, f'@{screen_name}', _media['expanded_url'], 'Video', get_heighest_video_quality(_media['video_info']['variants']), '', a['full_text']] + frr) if 'video_info' in _media and has_video else (_media['media_url_https'], f'{timestr}-img', [tweet_msecs, name, f'@{screen_name}', _media['expanded_url'], 'Image', _media['media_url_https'], '', a['full_text']] + frr) for _media in a['extended_entities']['media']]
                             elif text_save: # 无媒体内容
-                                _photo_lst += [('', '', [tweet_msecs, name, f'@{screen_name}', f'https://x.com/{screen_name}/status/{a["id_str"]}', 'Text', '', '', a['full_text']] + frr)]
+                                _photo_lst += [(f'https://x.com/{screen_name}/status/{a["id_str"]}', '', [tweet_msecs, name, f'@{screen_name}', f'https://x.com/{screen_name}/status/{a["id_str"]}', 'Text', '', '', a['full_text']] + frr)]
 
                         elif has_retweet:
                             name = a['retweeted_status_result']['result']['core']['user_results']['result']['legacy']['name']
@@ -264,7 +264,7 @@ def get_download_url(_user_info):
                             if 'extended_entities' in a['retweeted_status_result']['result']['legacy'] and screen_name != _user_info.screen_name:
                                 _photo_lst += [(get_heighest_video_quality(_media['video_info']['variants']), f'{timestr}-vid-retweet', [tweet_msecs, name, f"@{screen_name}", _media['expanded_url'], 'Video', get_heighest_video_quality(_media['video_info']['variants']), '', full_text] + frr) if 'video_info' in _media and has_video else (_media['media_url_https'], f'{timestr}-img-retweet', [tweet_msecs, name, f"@{screen_name}", _media['expanded_url'], 'Image', _media['media_url_https'], '', full_text] + frr) for _media in a['retweeted_status_result']['result']['legacy']['extended_entities']['media']]
                             elif text_save: # 无媒体内容
-                                _photo_lst += [('', 'retweet', [tweet_msecs, name, f'@{screen_name}', f'https://x.com/{screen_name}/status/{id_str}', 'Text', '', '', full_text] + frr)]
+                                _photo_lst += [(f'https://x.com/{screen_name}/status/{id_str}', 'retweet', [tweet_msecs, name, f'@{screen_name}', f'https://x.com/{screen_name}/status/{id_str}', 'Text', '', '', full_text] + frr)]
 
                     elif not _result[1]:    #已超出目标时间范围
                         start_label = False
@@ -289,7 +289,7 @@ def get_download_url(_user_info):
                         if 'extended_entities' in a:
                             _photo_lst += [(get_heighest_video_quality(_media['video_info']['variants']), f'{timestr}-vid', [tweet_msecs, _user_info.name, f'@{_user_info.screen_name}', _media['expanded_url'], 'Video', get_heighest_video_quality(_media['video_info']['variants']), '', a['full_text']] + frr) if 'video_info' in _media and has_video else (_media['media_url_https'], f'{timestr}-img', [tweet_msecs, _user_info.name, f'@{_user_info.screen_name}', _media['expanded_url'], 'Image', _media['media_url_https'], '', a['full_text']] + frr) for _media in a['extended_entities']['media']]
                         elif text_save: # 无媒体内容
-                            _photo_lst += [('', '', [tweet_msecs, _user_info.name, f'@{_user_info.screen_name}', f'https://x.com/{_user_info.screen_name}/status/{a["id_str"]}', 'Text', '', '', a['full_text']] + frr)]
+                            _photo_lst += [(f'https://x.com/{_user_info.screen_name}/status/{a["id_str"]}', '', [tweet_msecs, _user_info.name, f'@{_user_info.screen_name}', f'https://x.com/{_user_info.screen_name}/status/{a["id_str"]}', 'Text', '', '', a['full_text']] + frr)]
                     elif not _result[1]:    #已超出目标时间范围
                         start_label = False
                         break
