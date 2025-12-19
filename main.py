@@ -75,6 +75,8 @@ download_time_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") # 开始下载�
 # downloaded_profile_image = set()
 downloaded_profile = {}
 
+is_error_in_downloading = False
+
 with open(setting_file, 'r', encoding='utf8') as f:
     settings = json.load(f)
     if not settings['save_path']:
@@ -249,7 +251,7 @@ def get_download_url(_user_info):
                                 name = a2['name']
                                 screen_name = a2['screen_name']
                                 profile_image_url_https = a2['profile_image_url_https']
-                                
+
                                 if f'@{screen_name}' not in downloaded_profile:
                                     with open(f"{_user_info.temp_path}{os.sep}profile_data{os.sep}{screen_name}-{download_time_str}.json", 'w', encoding='utf-8-sig') as f:
                                         f.write(json.dumps(a2, ensure_ascii=False))
@@ -332,6 +334,7 @@ def get_download_url(_user_info):
     else:
         url = url_top + url_bottom      #第一页,无cursor
     print(url)
+    global is_error_in_downloading
     try:
         global request_count
         conn = httpx.get(quote_url(url), headers=_headers, proxy=proxies)
@@ -345,6 +348,7 @@ def get_download_url(_user_info):
             else:
                 print('获取数据失败')
             print(conn)
+            is_error_in_downloading = True
             return
         if has_highlights:  #亮点模式
             raw_data = raw_data['data']['user']['result']['timeline']['timeline']['instructions'][-1]['entries']
@@ -352,7 +356,7 @@ def get_download_url(_user_info):
             raw_data = raw_data['data']['user']['result']['timeline_v2']['timeline']['instructions'][-1]['entries']
         else:   #usermedia模式
             raw_data = raw_data['data']['user']['result']['timeline_v2']['timeline']['instructions']
-        if (has_retweet or has_highlights) and 'cursor-top' in raw_data[0]['entryId']:      #含转推模式 所有推文已全部下载完成
+        if (has_retweet or has_highlights or text_save) and 'cursor-top' in raw_data[0]['entryId']:      #含转推模式 所有推文已全部下载完成
             return False
         
         if not has_retweet and not has_highlights and not text_save:     #usermedia模式下的下一页请求编号
@@ -382,6 +386,7 @@ def get_download_url(_user_info):
         print('获取推文信息错误')
         print(e)
         print(response)
+        is_error_in_downloading = True
         return False
     return photo_lst
 
@@ -465,9 +470,12 @@ def download_control(_user_info):
                     else:
                         url = url.replace('name=orig', 'name=4096x4096')
 
+        finished_downloading = False
+        
         while True:
+            if finished_downloading:
+                break
             photo_lst = get_download_url(_user_info)
-            finished_downloading = False
             if not photo_lst:
                 break
             elif photo_lst[0] == True:
@@ -477,18 +485,19 @@ def download_control(_user_info):
                 new_photo_lst = []
                 global combo_skipped
                 for x in photo_lst:
-                    if x[0]:
-                        if cache_data.is_present(x[0]):
+                    if x[0] and finished_downloading == False:
+                        if "profile" not in x[0]:
+                            if cache_data.is_present(x[0]):
+                                print("Downloading " + x[0])
+                                new_photo_lst.append(x)
+                                combo_skipped = 0
+                            else:
+                                print("Skipped " + x[0])
+                                combo_skipped += 1
+                                if(combo_skipped > 18):
+                                    finished_downloading = True
+                        else:
                             new_photo_lst.append(x)
-                            combo_skipped = 0
-                        elif "profile" not in x[0]:
-                            print("Skipped " + x[0])
-                            combo_skipped += 1
-                            if(combo_skipped > 25):
-                                finished_downloading = True
-                                break
-                if finished_downloading:
-                    break
                 await asyncio.gather(*[asyncio.create_task(down_save(url[0], url[1], url[2], order)) for order,url in enumerate(new_photo_lst)])
             else:
                 await asyncio.gather(*[asyncio.create_task(down_save(url[0], url[1], url[2], order)) for order,url in enumerate(photo_lst)])
@@ -553,23 +562,24 @@ def main(_user_info: object):
         else:
             start_time_stamp = backup_stamp
 
-    #download_control(_user_info)
+    download_control(_user_info)
 
     csv_file.csv_close()
     
-    if md_output:
-        md_file.md_close()
-        
-    for f in os.listdir(_user_info.temp_path):
-        if os.path.isfile(os.path.join(_user_info.temp_path, f)):
-            shutil.move(os.path.join(_user_info.temp_path, f), _user_info.save_path)
-        elif os.path.isdir(os.path.join(_user_info.temp_path, f)):
-            for f2 in os.listdir(os.path.join(_user_info.temp_path, f)):
-                if os.path.isfile(os.path.join(_user_info.temp_path, f, f2)):
-                    shutil.move(os.path.join(_user_info.temp_path, f, f2), os.path.join(_user_info.save_path, f))
+    if is_error_in_downloading == False:
+        if md_output:
+            md_file.md_close()
+            
+        for f in os.listdir(_user_info.temp_path):
+            if os.path.isfile(os.path.join(_user_info.temp_path, f)):
+                shutil.move(os.path.join(_user_info.temp_path, f), _user_info.save_path)
+            elif os.path.isdir(os.path.join(_user_info.temp_path, f)):
+                for f2 in os.listdir(os.path.join(_user_info.temp_path, f)):
+                    if os.path.isfile(os.path.join(_user_info.temp_path, f, f2)):
+                        shutil.move(os.path.join(_user_info.temp_path, f, f2), os.path.join(_user_info.save_path, f))
 
-    if down_log and cache_data:
-        del cache_data
+        if down_log and cache_data:
+            del cache_data
     print(f'{_user_info.name}下载完成\n\n')
 
 
